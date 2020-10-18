@@ -1,0 +1,125 @@
+---
+title: "Thesis 2010-2018 Test"
+output: html_notebook
+---
+
+
+```{r}
+# functions located in 
+source("thesis_code_functions.R")
+ ```
+
+```{r}
+# packages 
+
+library(ggplot2)
+library(leaflet)
+library(maptools)
+library(rgdal)
+```
+
+    
+```{r}
+
+# data for 2010
+bk_count_2010 <- crimeCount(2010) # crime 
+bk_gentri_2010 <- bkGentri(2010) # gentrification
+
+# data for 2018
+bk_count_2018 <- crimeCount(2018) # crime 
+bk_gentri_2018 <- bkGentri(2018) # gentrification
+
+
+# gentrification change rates for 2010-2018
+bk_gen_2010_2018 <- calcChange(bk_gentri_2010, bk_gentri_2018)
+
+# combine gentrification and crime 
+bk_gen_crime <- mergeTracts(2010, 2018)
+
+bk_gen_crime_nta <- bk_gen_crime %>%
+  filter(NTA_CODE != "BK99") %>%
+  group_by(NTA_CODE) %>%
+  mutate(NTA_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
+  mutate(FEL_NTA_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
+  mutate(FEL_NTA_CNT_2 = sum(FEL_CT_CNT_2)) %>%
+  mutate(TOTAL_POPN_NTA_1 = sum(TOTAL_POPN_1)) %>%
+  mutate(TOTAL_POPN_NTA_2 = sum(TOTAL_POPN_2)) %>%
+  mutate(FEL_NTA_PAX_1 = FEL_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
+  mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2)
+  
+  
+
+names(bk_gen_crime)
+names(bk_gen_crime_nta)
+
+```
+
+```{r}
+ct_map <- toSpatial(bk_gen_crime)
+
+nta_map <- toSpatial(bk_gen_crime_nta)
+
+View(nta_map)
+
+```
+
+
+```{r}
+
+# LEAFLET 
+
+# pal <- colorNumeric("viridis", domain = tract_map$GENTRI_SCORE)
+# 
+# map_gentri <- leaflet(tract_map) %>% 
+#   addTiles() %>% 
+#   addPolygons(stroke = FALSE, smoothFactor = 0.3, fillOpacity = 1, fillColor =
+#                 ~pal(tract_map$GENTRI_SCORE)) %>% 
+#   addProviderTiles(providers$CartoDB.Positron)
+#   
+# map_gentri
+
+
+```
+
+
+
+```{r}
+
+# leaflet 
+# pal <- colorNumeric("magma", domain = tract_map$FEL_CT_CNT)
+# 
+# map_crime <- leaflet(tract_map) %>% 
+#   addTiles() %>% 
+#   addPolygons(stroke = FALSE, smoothFactor = 0.3, fillOpacity = 1, fillColor =
+#                 ~pal(tract_map$FEL_CT_CNT)) %>% 
+#   addProviderTiles(providers$CartoDB.Positron)
+# 
+# map_crime
+# a
+```
+
+
+```{r}
+library(ggthemes)
+theme_set(theme_classic())
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+View(nta_map)
+
+ggplot(data = nta_map) +
+  geom_sf(aes(fill = NTA_GENTRI_SCORE)) + 
+  scale_fill_viridis_c(option = "magma", direction = 1)
+
+ggplot(data = nta_map) + 
+  geom_sf(aes(fill = FEL_NTA_PAX_1)) + 
+  scale_fill_viridis_c(option = "viridis", direction = -1, limits=c(0.0061, 0.041))
+
+ggplot(data = nta_map) + 
+  geom_sf(aes(fill = FEL_NTA_CNT_2)) + 
+  scale_fill_viridis_c(option = "viridis", direction = -1, limits=c(126, 3120))
+
+range(nta_map$FEL_NTA_CNT_1)
+range(nta_map$FEL_NTA_CNT_2)
+```
+
