@@ -5,6 +5,7 @@ library(dplyr)
 library(data.table)
 library(tidycensus)
 
+
 # ------------------------------------------- # 
 # ------------ CRIME IN BROOKYLN ------------ #
 # ------------------------------------------- # 
@@ -152,7 +153,7 @@ bkGentri <- function(year) {
                          state = "NY",
                          year = year)
   
-  census_data %>% 
+  census_data_tract %>% 
     mutate(YEAR = year) %>% 
     select(GEOID, NAME, TOTAL_POPN, WHITE_ALONE, FOREIGN_BORN, NO_HIGHSCH, YEAR)
   
@@ -312,15 +313,19 @@ mergeTracts <- function(earlier_year, later_year) {
 lines_ny <- st_read("data/ntashp/nynta.shp")# set CRS from line from tracts.shpfile 2018
 # head(lines_bk)
 
+lines_bk <- lines_ny %>% 
+  filter(BoroName == "Brooklyn")
+
 
 # ******************** FUNCTION ************************* # 
 # convert dataframe to plot table spatial object
 
 toSpatial <- function(df) {
   
-  merged <- merge(lines_ny, df)
+  merged <- merge(lines_bk, df)
   tract_map <- merged %>% st_transform('+proj=longlat +datum=WGS84')  
   
 }
 
 # ******************** //////// ************************* # 
+

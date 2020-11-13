@@ -16,6 +16,9 @@ library(ggplot2)
 library(leaflet)
 library(maptools)
 library(rgdal)
+library(extrafont)
+library(ggthemes)
+ 
 ```
 
     
@@ -25,6 +28,34 @@ library(rgdal)
 bk_count_2010 <- crimeCount(2010) # crime 
 bk_gentri_2010 <- bkGentri(2010) # gentrification
 
+# data for 2011
+bk_count_2011 <- crimeCount(2011) # crime 
+bk_gentri_2011 <- bkGentri(2011) # gentrification
+
+# data for 2012
+bk_count_2012 <- crimeCount(2012) # crime 
+bk_gentri_2012 <- bkGentri(2012) # gentrification
+
+# data for 2013
+bk_count_2013 <- crimeCount(2013) # crime 
+bk_gentri_2013 <- bkGentri(2013) # gentrification
+
+# data for 2014
+bk_count_2014 <- crimeCount(2014) # crime 
+bk_gentri_2014 <- bkGentri(2014) # gentrification
+
+# data for 2015
+bk_count_2015 <- crimeCount(2015) # crime 
+bk_gentri_2015 <- bkGentri(2015) # gentrification
+
+# data for 2016
+bk_count_2016 <- crimeCount(2016) # crime 
+bk_gentri_2016 <- bkGentri(2016) # gentrification
+
+# data for 2017
+bk_count_2017 <- crimeCount(2017) # crime 
+bk_gentri_2017 <- bkGentri(2017) # gentrification
+
 # data for 2018
 bk_count_2018 <- crimeCount(2018) # crime 
 bk_gentri_2018 <- bkGentri(2018) # gentrification
@@ -33,33 +64,188 @@ bk_gentri_2018 <- bkGentri(2018) # gentrification
 # gentrification change rates for 2010-2018
 bk_gen_2010_2018 <- calcChange(bk_gentri_2010, bk_gentri_2018)
 
+# gentrification change rates for 2010-2011
+bk_gen_2010_2011 <- calcChange(bk_gentri_2010, bk_gentri_2011)
+
+# gentrification change rates for 2011-2012
+bk_gen_2011_2012 <- calcChange(bk_gentri_2011, bk_gentri_2012)
+
+# gentrification change rates for 2012-2013
+bk_gen_2012_2013 <- calcChange(bk_gentri_2012, bk_gentri_2013)
+
+# gentrification change rates for 2013-2014
+bk_gen_2013_2014 <- calcChange(bk_gentri_2013, bk_gentri_2014)
+
+# gentrification change rates for 2014-2015
+bk_gen_2014_2015 <- calcChange(bk_gentri_2014, bk_gentri_2015)
+
+# gentrification change rates for 2015-2016
+bk_gen_2015_2016 <- calcChange(bk_gentri_2015, bk_gentri_2016)
+
 # combine gentrification and crime 
 bk_gen_crime <- mergeTracts(2010, 2018)
 
-bk_gen_crime_nta <- bk_gen_crime %>%
-  filter(NTA_CODE != "BK99") %>%
-  group_by(NTA_CODE) %>%
-  mutate(NTA_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
-  mutate(FEL_NTA_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
-  mutate(FEL_NTA_CNT_2 = sum(FEL_CT_CNT_2)) %>%
-  mutate(TOTAL_POPN_NTA_1 = sum(TOTAL_POPN_1)) %>%
-  mutate(TOTAL_POPN_NTA_2 = sum(TOTAL_POPN_2)) %>%
-  mutate(FEL_NTA_PAX_1 = FEL_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
-  mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2)
-  
-  
+bk_gen_crime_2011 <- mergeTracts(2010, 2011)
+bk_gen_crime_2012 <- mergeTracts(2011, 2012)
+bk_gen_crime_2013 <- mergeTracts(2012, 2013)
+bk_gen_crime_2014 <- mergeTracts(2013, 2014)
 
-names(bk_gen_crime)
-names(bk_gen_crime_nta)
+
+calcScore <- function(bk_gen_crime) {
+  
+  bk_gen_crime %>%
+    filter(NTA_CODE != "BK99") %>%
+    group_by(NTA_CODE) %>%
+    mutate(NTA_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
+    mutate(FEL_NTA_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
+    mutate(FEL_NTA_CNT_2 = sum(FEL_CT_CNT_2)) %>%
+    mutate(TOTAL_POPN_NTA_1 = sum(TOTAL_POPN_1)) %>%
+    mutate(TOTAL_POPN_NTA_2 = sum(TOTAL_POPN_2)) %>%
+    mutate(FEL_NTA_PAX_1 = FEL_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
+    mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2) %>% 
+    mutate(FEL_NTA_CHANGE = FEL_NTA_PAX_2 - FEL_NTA_PAX_1) %>% 
+    # for nta only 
+    select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_CHANGE) %>% 
+    distinct()
+
+  }
+
+bkg_2011 <- calcScore(bk_gen_crime_2011)
+bkg_2012 <- calcScore(bk_gen_crime_2012)
+bkg_2013 <- calcScore(bk_gen_crime_2013)
+bkg_2014 <- calcScore(bk_gen_crime_2014)
+  
 
 ```
 
+
 ```{r}
-ct_map <- toSpatial(bk_gen_crime)
+# trying to plot map but failing 
 
-nta_map <- toSpatial(bk_gen_crime_nta)
 
-View(nta_map)
+# ct_map <- toSpatial(bk_gen_crime)
+# 
+# nta_map <- toSpatial(bk_gen_crime_nta)
+# 
+# 
+# merged_nta <- merge(lines_bk, bk_gen_crime_scored)
+# merged_nta <- merge(lines_bk, bk_nta)
+# 
+# nta_map <- merged_nta %>% st_transform('+proj=longlat +datum=WGS84')  
+# 
+# names(bk_nta)
+# head(lines_bk)
+# 
+# lines_nta_88 <- lines_bk %>% 
+#   # group_by(NTAName) %>% 
+#    filter(NTACode == "BK88") %>%
+#   st_union()
+# 
+# View(lines_nta)
+# 
+# lines_bk %>%
+#   select(NTAName) %>% 
+#   distinct() %>%
+#   dim()
+#   
+# 
+# head(lines_nta)
+# head(lines_bk)
+# 
+# lines_nta_88
+
+
+```
+
+
+```{r}
+# distinguishing gentrified and less gentrified neighborhoods (binary)
+
+# added into the function
+bk_nta <- bk_gen_crime_scored %>%
+  select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_CHANGE) %>% 
+  distinct()
+
+
+
+ggplot(data = bk_nta) + 
+  geom_text(aes(label = NTA_NAME), size = 2,
+            x = bk_gen_crime_scored_NTA$NTA_GENTRI_SCORE,
+            y = bk_gen_crime_scored_NTA$FEL_NTA_CHANGE) +
+  # geom_point(x = bk_gen_crime_scored_NTA$NTA_GENTRI_SCORE,
+  #           y = bk_gen_crime_scored_NTA$FEL_NTA_CHANGE) +
+  ylim(-0.013, 0.004) + # felony score 
+  xlim(-5, 6) + 
+  labs(title = "Crime and Gentrification in Brooklyn (2010-2018)\n",  
+       x = "\nGentrification Score", 
+       y = "Change in Felony Crime Rate\n") #+ 
+  # theme_economist_white() +
+  # theme(text = element_text(family = "Corbel", size = 14))
+
+
+```
+
+
+
+```{r}
+
+
+ntaMean <- function(bkg, year) {
+  
+  bkg %>% 
+    mutate(gentrified = (NTA_GENTRI_SCORE > 0)) %>% 
+    group_by(gentrified) %>% 
+    summarise(avg_gentri = mean(NTA_GENTRI_SCORE), 
+              avg_fel_change = mean(FEL_NTA_CHANGE)) %>% 
+    mutate(year = year)
+
+}
+
+
+nta_mean <- ntaMean(bkg_2011, 2011) %>% 
+  bind_rows(ntaMean(bkg_2012, 2012)) %>%
+  bind_rows(ntaMean(bkg_2013, 2013)) %>%
+  bind_rows(ntaMean(bkg_2014, 2014))
+
+head(nta_mean)
+```
+
+```{r}
+
+nta_mean_gentri <- nta_mean %>% 
+  filter(gentrified == TRUE)
+
+nta_mean_no_gentri <- nta_mean %>% 
+  filter(gentrified == FALSE)
+
+typeof(as.Date(nta_mean_gentri$year))
+
+ggplot() +
+  geom_point(data = nta_mean_gentri,
+             x = as.Date(nta_mean_gentri$year),
+             y = nta_mean_gentri$avg_fel_change*10000) +
+  geom_point(data = nta_mean_no_gentri,
+           x = as.Date(nta_mean_gentri$year),
+           y = nta_mean_no_gentri$avg_fel_change*10000,
+           color = "purple") +
+  # geom_line(x = nta_mean_gentri$year,
+  #        y = nta_mean_gentri$avg_fel_change*10000) + 
+  geom_line(aes(x = nta_mean_gentri$year,
+         y = nta_mean_gentri$avg_fel_change*10000,
+         gentrification = "Yes")) +
+  geom_line(aes(x = nta_mean_gentri$year,
+       y = nta_mean_no_gentri$avg_fel_change*10000, gentrification = "No"),
+       color = "purple") +
+  ylim(-10, 10) + 
+  xlim(2010, 2015)
+
+range(nta_mean_no_gentri$avg_fel_change*10000)
+
+range(nta_mean_gentri$avg_fel_change*10000)
+
+
+# perhaps it should be crime rate, not change in crime rate that we graph 
+
 
 ```
 
@@ -99,6 +285,8 @@ View(nta_map)
 ```
 
 
+# Mapping 
+
 ```{r}
 library(ggthemes)
 theme_set(theme_classic())
@@ -109,7 +297,15 @@ View(nta_map)
 
 ggplot(data = nta_map) +
   geom_sf(aes(fill = NTA_GENTRI_SCORE)) + 
-  scale_fill_viridis_c(option = "magma", direction = 1)
+  scale_fill_viridis_c(option = "magma", direction = 1, limits=c(-5, 6))
+
+ggplot(data = nta_map) +
+  geom_sf(aes(fill = FEL_NTA_CHANGE)) + 
+  scale_fill_viridis_c(option = "viridis", direction = -1, limits=c(-0.015, 0.004))
+
+c(nta_map$FEL_NTA_CHANGE)
+
+View(nta_map)
 
 ggplot(data = nta_map) + 
   geom_sf(aes(fill = FEL_NTA_PAX_1)) + 
@@ -119,7 +315,5 @@ ggplot(data = nta_map) +
   geom_sf(aes(fill = FEL_NTA_CNT_2)) + 
   scale_fill_viridis_c(option = "viridis", direction = -1, limits=c(126, 3120))
 
-range(nta_map$FEL_NTA_CNT_1)
-range(nta_map$FEL_NTA_CNT_2)
 ```
 
