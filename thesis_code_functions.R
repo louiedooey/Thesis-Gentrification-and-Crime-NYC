@@ -11,7 +11,7 @@ library(tidycensus)
 # ------------------------------------------- # 
 
 # https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i
-nypd  <- fread("data/NYPD-2/NYPD.csv", header = TRUE)
+# nypd  <- fread("data/NYPD-2/NYPD.csv", header = TRUE)
 
 # Sorting out NYPD Dataset
 
@@ -233,30 +233,31 @@ tracts <- read_sf("data/boundaries/tracts/tl_2018_36_tract.shp")
 # ******************** FUNCTION ************************* # 
 
 
-mergeTracts <- function(earlier_year, later_year) {
+mergeTracts <- function(bk_gen_1_2, bk_count_1, bk_count_2) {
   
   # set year range 
-  year_range <- paste(earlier_year, later_year, sep = "_")
-  
-  # datasets 
-  # crime count 
-  bk_count_earlier <- get(paste("bk_count", earlier_year, sep = "_"))
-  bk_count_later <- get(paste("bk_count", later_year, sep = "_")) # this only takes latest year 
-  
-  # gentrification (change)
-  bk_gen <- get(paste("bk_gen", year_range, sep = "_")) # year range: e.g. 10_18 for 2010-2018
-  
+  # year_range <- paste(earlier_year, later_year, sep = "_")
+  # 
+  # # crime count 
+  # # bk_count_1 <- get(paste("bk_count", earlier_year, sep = "_"))
+  # # bk_count_2 <- get(paste("bk_count", later_year, sep = "_")) # this only takes latest year 
+  # # 
+  # # gentrification (change)
+  # bk_gen <- get(paste("bk_gen", year_range, sep = "_")) # year range: e.g. 10_18 for 2010-2018
+  bk_gen <- bk_gen_1_2
+  # 
   # merge spatial data (GEOID, Tract No.) with gentrification (GEOID)
   tracts_geoid <- merge(tracts, bk_gen, by.x="GEOID", by.y="GEOID")
   geoid_df <- as_tibble(tracts_geoid)
   
+  
   # ----
   # merge gentrification & spatial with crime 
-  bk_gentri_crime_y1 <- geoid_df %>%
+  bk_gentri_crime_1 <- geoid_df %>%
     rename("TRACT_NO" = "NAME") %>%
     
     # with earlier year crime data 
-    left_join(bk_count_earlier, by = "TRACT_NO") %>% # Merge with Tract No.
+    left_join(bk_count_1, by = "TRACT_NO") %>% # Merge with Tract No.
     # mutate(OFN_NTA_PAX = OFN_NTA_CNT/TOTAL_POPN) %>%
     # mutate(OFN_CT_PAX = OFN_CT_CNT/TOTAL_POPN) %>%
     mutate(FEL_CT_PAX = FEL_CT_CNT/TOTAL_POPN_1) %>%
@@ -269,9 +270,9 @@ mergeTracts <- function(earlier_year, later_year) {
            "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
            "FEL_CT_PAX_1", "FEL_CT_CNT_1") 
   
-  bk_gentri_crime <- bk_gentri_crime_y1 %>%
+  bk_gentri_crime <- bk_gentri_crime_1 %>%
     # with latest year crime data 
-    left_join(bk_count_later, by = "TRACT_NO") %>%
+    left_join(bk_count_2, by = "TRACT_NO") %>%
     mutate(FEL_CT_PAX = FEL_CT_CNT/TOTAL_POPN_2) %>%
     rename(FEL_CT_PAX_2 = FEL_CT_PAX,
            FEL_CT_CNT_2 = FEL_CT_CNT) %>%
@@ -292,6 +293,40 @@ mergeTracts <- function(earlier_year, later_year) {
 
 # ******************** /////// ************************* # 
 
+
+# get the mean for NTA e.g. mean Felony rate and change, mean Gentri score, remove BK99, 
+calcScore <- function(bk_gen_crime) {
+  
+  bk_gen_crime %>%
+    filter(NTA_CODE != "BK99") %>%
+    group_by(NTA_CODE) %>%
+    mutate(NTA_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
+    mutate(FEL_NTA_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
+    mutate(FEL_NTA_CNT_2 = sum(FEL_CT_CNT_2)) %>%
+    mutate(TOTAL_POPN_NTA_1 = sum(TOTAL_POPN_1)) %>%
+    mutate(TOTAL_POPN_NTA_2 = sum(TOTAL_POPN_2)) %>%
+    mutate(FEL_NTA_PAX_1 = FEL_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
+    mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2) %>% 
+    mutate(FEL_NTA_CHANGE = FEL_NTA_PAX_2 - FEL_NTA_PAX_1) %>% 
+    # for nta only 
+    select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_PAX_1, FEL_NTA_PAX_2, FEL_NTA_CHANGE) %>% 
+    distinct()
+  
+}
+
+
+ntaMean <- function(bkg, year) {
+  
+  bkg %>% 
+    mutate(gentrified = (NTA_GENTRI_SCORE > 0)) %>% 
+    group_by(gentrified) %>% 
+    summarise(avg_gentri = mean(NTA_GENTRI_SCORE), 
+              avg_crime_rate_1 = mean(FEL_NTA_PAX_1),
+              avg_crime_rate_2 = mean(FEL_NTA_PAX_2),
+              crime_change = mean(FEL_NTA_CHANGE)) %>%  # crime rate per pax
+    mutate(year = year)
+  
+}
 
 # final_2010_2018<- mergeTracts(2010, 2018)
 # # 
