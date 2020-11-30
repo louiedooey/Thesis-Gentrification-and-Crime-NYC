@@ -4,27 +4,49 @@ library(sf)
 library(dplyr)
 library(data.table)
 library(tidycensus)
+library(ggplot2)
+library(maptools)
+library(rgdal)
+library(showtext)
+library(ggthemes)
+library(hrbrthemes)
+library(cowplot) # for grid plot
+library(beepr)
+library(GISTools)
+library(spdep)
 
+# Fonts 
+showtext_auto()
+font_add(family = "raleway", regular = "Raleway-Regular.ttf")
+font_add(family = "jaapokki", regular = "Jaapokki-Regular.otf")
 
 # ------------------------------------------- # 
 # ------------ CRIME IN BROOKYLN ------------ #
 # ------------------------------------------- # 
 
 # https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i
-# nypd  <- fread("data/NYPD-2/NYPD.csv", header = TRUE)
+# nypd  <- fread("data/NYPD/NYPD.csv", header = TRUE)
+
 
 # Sorting out NYPD Dataset
 
 # variables renamed 
-nypd_renamed <- nypd %>% 
-  rename("PRECINCT" = "ADDR_PCT_CD",
-         "REPORTED_DATE" = "RPT_DT", # only using crimes reported
-         "OFFENSE_LV" = "LAW_CAT_CD",
-         "OFFENSE_DESC" = "OFNS_DESC")
+# nypd_renamed <- nypd %>% 
+#   rename("PRECINCT" = "ADDR_PCT_CD",
+#          "REPORTED_DATE" = "RPT_DT", # only using crimes reported
+#          "OFFENSE_LV" = "LAW_CAT_CD",
+#          "OFFENSE_DESC" = "OFNS_DESC")
+
+# nypd_bk <- nypd %>% 
+#   filter(BORO_NM == "BROOKLYN") %>%
+#   rename("PRECINCT" = "ADDR_PCT_CD",
+#          "REPORTED_DATE" = "RPT_DT", # only using crimes reported
+#          "OFFENSE_LV" = "LAW_CAT_CD",
+#          "OFFENSE_DESC" = "OFNS_DESC")
+# write.csv(nypd_bk, "data/NYPD/nypd_brooklyn.csv")
   
 # only brooklyn data and relevant column
-nypd_brooklyn_data <- nypd_renamed %>% 
-  filter(BORO_NM == "BROOKLYN") %>% 
+nypd_brooklyn_data <- nypd %>% 
   filter(OFFENSE_LV == "FELONY") %>% # filter to offense level of felony, the most severe
   dplyr::select(CMPLNT_NUM, # complaint serial/reference number
                 PRECINCT, # police dept precinct of crime occurrence
@@ -49,7 +71,7 @@ geo_url <- "https://data.cityofnewyork.us/api/geospatial/fxpq-c8ku?method=export
 # Get Census Tract Boundary Data, reduce variables
 tract_sf <- read_sf(geo_url) %>% 
   st_transform(2263) %>%
-  select(ntacode, ntaname, # neighborhood code & name (55 for Brooklyn eg Crown Heights, Bushwick)
+  dplyr::select(ntacode, ntaname, # neighborhood code & name (55 for Brooklyn eg Crown Heights, Bushwick)
          boro_code, boro_name, #  borough code & name (Brooklyn, Manhattan, Queens, Bronx...)
          boro_ct2010, # borough census tract defined in 2010, compound key
          ctlabel) %>% # census tract label (number)
@@ -106,7 +128,7 @@ crimeCount <- function(year) {
     rename("FELONY_TYPE" = "OFFENSE_DESC") %>% # type of felony, bc crimes here are felonies only
     # ------------------------------
   filter(BORO_NAME == "Brooklyn") %>% # only for Brooklyn borough
-    select(NTA_CODE, NTA_NAME, # neighborhood code & name
+    dplyr::select(NTA_CODE, NTA_NAME, # neighborhood code & name
            BORO_NAME, # brooklyn 
            BORO_CT_KEY, TRACT_NO, # census tract code & compound key 
            FELONY_TYPE,  FEL_NTA_CNT, FEL_CT_CNT, # felonies 
@@ -155,7 +177,7 @@ bkGentri <- function(year) {
   
   census_data_tract %>% 
     mutate(YEAR = year) %>% 
-    select(GEOID, NAME, TOTAL_POPN, WHITE_ALONE, FOREIGN_BORN, NO_HIGHSCH, YEAR)
+    dplyr::select(GEOID, NAME, TOTAL_POPN, WHITE_ALONE, FOREIGN_BORN, NO_HIGHSCH, YEAR)
   
   
 } 
@@ -203,7 +225,7 @@ calcChange <- function(bk_gentri_1, bk_gentri_2) {
            "YEAR" = "YEAR.x", 
            "TOTAL_POPN_1" = "TOTAL_POPN.y",
            "TOTAL_POPN_2" = "TOTAL_POPN.x") %>%
-    select(GEOID, CENSUS_TRACT, YEAR, GENTRI_SCORE, 
+    dplyr::select(GEOID, CENSUS_TRACT, YEAR, GENTRI_SCORE, 
            TOTAL_POPN_1, TOTAL_POPN_2, POPN_CHANGE, 
            WHITE_CHANGE, FOREIGN_CHANGE, NO_HS_CHANGE) %>%
     na.omit()
@@ -264,7 +286,7 @@ mergeTracts <- function(bk_gen_1_2, bk_count_1, bk_count_2) {
     rename(FEL_CT_PAX_1 = FEL_CT_PAX,
            FEL_CT_CNT_1 = FEL_CT_CNT) %>%
     # select variables to prevent repetition
-    select("YEAR",
+    dplyr::select("YEAR",
            "GEOID", "TRACT_NO", "CENSUS_TRACT", 
            "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
            "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
@@ -278,7 +300,7 @@ mergeTracts <- function(bk_gen_1_2, bk_count_1, bk_count_2) {
            FEL_CT_CNT_2 = FEL_CT_CNT) %>%
     
     # select variables
-    select("BORO_NAME", "YEAR",
+    dplyr::select("BORO_NAME", "YEAR",
            "GEOID", "NTA_NAME", "NTA_CODE", "BORO_CT_KEY", "TRACT_NO", "CENSUS_TRACT", 
            "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
            "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
@@ -309,7 +331,7 @@ calcScore <- function(bk_gen_crime) {
     mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2) %>% 
     mutate(FEL_NTA_CHANGE = FEL_NTA_PAX_2 - FEL_NTA_PAX_1) %>% 
     # for nta only 
-    select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_PAX_1, FEL_NTA_PAX_2, FEL_NTA_CHANGE) %>% 
+    dplyr::select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_PAX_1, FEL_NTA_PAX_2, FEL_NTA_CHANGE) %>% 
     distinct()
   
 }
@@ -344,23 +366,192 @@ ntaMean <- function(bkg, year) {
 
 # read lines from tract shape file 
 
-# lines_ny <- st_read("data/boundaries/tracts/tl_2018_36_tract.shp")# set CRS from line from tracts.shp
-lines_ny <- st_read("data/ntashp/nynta.shp")# set CRS from line from tracts.shpfile 2018
+tract_lines_bk <- st_read("data/boundaries/tracts/tl_2018_36_tract.shp")# set CRS from line from tracts.shp
+
+nta_lines_ny <- st_read("data/ntashp/nynta.shp")# set CRS from line from tracts.shpfile 2018
 # head(lines_bk)
 
-lines_bk <- lines_ny %>% 
-  filter(BoroName == "Brooklyn")
+nta_lines_bk <- nta_lines_ny %>% 
+  filter(BoroName == "Brooklyn") %>%
+  rename(NTA_CODE = NTACode) %>% 
+  rename(NTA_NAME = NTAName)
 
 
 # ******************** FUNCTION ************************* # 
 # convert dataframe to plot table spatial object
 
-toSpatial <- function(df) {
+toSpatial_NTA <- function(df) {
   
-  merged <- merge(lines_bk, df)
+  merged <- merge(nta_lines_bk, df, by = c("NTA_CODE", "NTA_NAME"))
+  nta_map <- merged %>% st_transform('+proj=longlat +datum=WGS84')  
+  
+}
+
+toSpatial_tracts <- function(df) {
+  
+  merged <- merge(tract_lines_bk, df, by = "GEOID")
   tract_map <- merged %>% st_transform('+proj=longlat +datum=WGS84')  
   
 }
 
 # ******************** //////// ************************* # 
 
+
+
+# -------------------------------------------------------- # 
+# -------------------- VISUALIZATIONS -------------------- #
+# -------------------------------------------------------- #
+
+
+
+# ******************** FUNCTION ************************* # 
+# plotting scatterplot of neighborhood name   
+  
+plotTextScatter <- function(bkg_year, year_1, year_2) { 
+  
+  bk_nta <- bkg_year %>%
+    dplyr:: select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_CHANGE) %>% 
+    # filter(NTA_GENTRI_SCORE < 0) %>%
+    distinct()
+  
+  ggplot(data = bk_nta) + 
+    
+    geom_text(aes(label = NTA_NAME), 
+              size = 2.5, color = "#333333", family = "raleway",
+              x = bk_nta$NTA_GENTRI_SCORE,
+              y = bk_nta$FEL_NTA_CHANGE) +
+    
+    geom_hline(yintercept = 0, color = "cyan3") +
+    geom_vline(xintercept = 0, color = "darksalmon") +
+    
+    ylim(min(bk_nta$FEL_NTA_CHANGE)*1.2, max(bk_nta$FEL_NTA_CHANGE)*1.2) + # felony score 
+    xlim(min(bk_nta$NTA_GENTRI_SCORE)*1.2, max(bk_nta$NTA_GENTRI_SCORE)*1.2) + 
+    labs(title = paste("\n", year_1, "-", year_2, "\n"),
+         # title = paste("Crime and Gentrification in Brooklyn (", year_1, "-", year_2, ")\n", sep = ""),  
+         x = "\nGentrification Score\n", 
+         y = "\nChange in Felony Crime Rate\n") +
+    theme_tufte() +
+    theme(text = element_text(family = "raleway"),
+          plot.title = element_text(family = "jaapokki"))
+  
+} 
+
+# ******************** FUNCTION ************************* # 
+
+
+plotMapGentri <- function(df, year_1, year_2) {
+
+  ggplot(data = df) +
+    geom_sf(aes(fill = NTA_GENTRI_SCORE), color = NA) +
+    scale_fill_viridis_c(option = "magma", name = "Gentrification Score") +
+    labs(title = paste("\n", year_1, "-", year_2, "\n")) +
+    theme_map() +
+    theme(text = element_text(family = "raleway", size = 12),
+          plot.title = element_text(family = "jaapokki", size = 18))
+
+}
+
+
+plotMapCrime <- function(df, year_1, year_2) {
+  
+  ggplot(data = df) +
+    geom_sf(aes(fill = FEL_NTA_CHANGE), color = NA) +
+    scale_fill_viridis_c(option = "viridis", name = "Change in Crime Rates", direction = -1) + 
+    labs(title = paste("\n", year_1, "-", year_2, "\n")) + 
+    theme_map() + 
+    theme(text = element_text(family = "raleway", size = 12), 
+          plot.title = element_text(family = "jaapokki", size = 18))
+  
+}
+
+
+# ******************** FUNCTION ************************* # 
+
+
+mapAnalysis <- function(nta_map, var) {
+  
+  map_analysis <- nta_map %>% 
+    as_Spatial()
+  
+  # Queens Contiguity Matrix
+  spat_matrix <- poly2nb(map_analysis)
+  
+  # Neighbors list with Spatial Weihgts
+  list_w <- nb2listw(spat_matrix)
+  
+  # calculate local Moran of the distribution 
+  lmoran <- localmoran(map_analysis$var, list_w)
+  
+  # padronize the variable and save it to a new column 
+  map_analysis$s_var <- scale(map_analysis$var) %>% as.vector()
+  
+  # create a spatially lagged variable and save it to a new column 
+  map_analysis$lag_s_var <- lag.listw(list_w, map_analysis$s_var)
+  
+  # moran scatterplot, in basic graphics - with identificaiton of influential observations 
+  x <- map_analysis$s_var
+  y <- map_analysis$lag_s_var %>% as.vector()
+  xx <- data.frame(x, y)
+  
+  g <- ggplot(xx, aes(x, y)) + 
+    geom_point() + 
+    geom_smooth(method = "lm", se = F) + 
+    geom_hline(yintercept = 0, linetype = "dashed") + 
+    geom_vline(xintercept = 0, linetype = "dashed")
+  
+  # QUADRANTS 
+  
+  map_analysis$quad_sig <- NA
+  
+  # high high quadrant 
+  map_analysis[(map_analysis$s_var >= 0 & 
+                  map_analysis$lag_s_var >= 0) & 
+                 (lmoran[, 5] <= 0.05), "quad_sig"] <- "high-high"
+  
+  # low low  quadrant 
+  map_analysis[(map_analysis$s_var <= 0 & 
+                  map_analysis$lag_s_var <= 0) & 
+                 (lmoran[, 5] <= 0.05), "quad_sig"] <- "low-low"
+  
+  # high low  quadrant 
+  map_analysis[(map_analysis$s_var >= 0 & 
+                  map_analysis$lag_s_var <= 0) & 
+                 (lmoran[, 5] <= 0.05), "quad_sig"] <- "highlow"
+  
+  # low low  quadrant 
+  map_analysis[(map_analysis$s_var <= 0 & 
+                  map_analysis$lag_s_var >= 0) & 
+                 (lmoran[, 5] <= 0.05), "quad_sig"] <- "low-high"
+  
+  # non-significant observations
+  
+  map_analysis@data[(lmoran[, 5] > 0.05), "quad_sig"] <- "not signif."
+  map_analysis$quad_sig <- as.factor(map_analysis$quad_sig)
+  map_analysis@data$id <- rownames(map_analysis@data)
+  
+  
+  
+  # plotting the map
+  df <- fortify(map_analysis, region = "id") # make it ready for mapping
+  df <- left_join(df, map_analysis@data)
+  
+  
+  lisa_plot <- df %>% 
+    ggplot(aes(long, lat, group = group, fill = quad_sig)) + 
+    geom_polygon(color = "white", size = .05) + 
+    coord_equal() + 
+    labs(title = "\nLISA Clusters\n") +
+    # for\nChange in Gentrification Score (2010-2018)") +
+    scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
+    theme_map() + 
+    theme(text = element_text(family = "raleway", size = 12), 
+          plot.title = element_text(family = "jaapokki", size = 18, color = "grey20"))
+  
+  return(c(summary(lmoran), 
+           # summary of variables to form the analysis 
+           summary(map_analysis$s_var),
+           summary(map_analysis$lag_s_var),
+           g, 
+           lisa_plot))
+  
+}
