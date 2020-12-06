@@ -37,3 +37,10 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+*.csv
+data/brooklyn-crime-nta/full/joined-boundaries-crime.cpg
+data/brooklyn-crime-nta/full/joined-boundaries-crime.dbf
+data/brooklyn-crime-nta/full/joined-boundaries-crime.prj
+data/brooklyn-crime-nta/full/joined-boundaries-crime.qpj
+data/brooklyn-crime-nta/full/joined-boundaries-crime.shp
+data/brooklyn-crime-nta/full/joined-boundaries-crime.shx

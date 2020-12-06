@@ -1,7 +1,7 @@
 
 ## Thesis Code Functions ##
 library(sf)
-library(dplyr)
+library(tidyverse)
 library(data.table)
 library(tidycensus)
 library(ggplot2)
@@ -14,11 +14,19 @@ library(cowplot) # for grid plot
 library(beepr)
 library(GISTools)
 library(spdep)
+library(rgeos)
 
 # Fonts 
 showtext_auto()
-font_add(family = "raleway", regular = "Raleway-Regular.ttf")
-font_add(family = "jaapokki", regular = "Jaapokki-Regular.otf")
+font_add(family = "raleway", regular = "fonts/Raleway-Regular.ttf")
+font_add(family = "jaapokki", regular = "fonts/Jaapokki-Regular.otf")
+font_add(family = "proximanova", regular = "fonts/ProximaNova-Reg.ttf")
+font_add(family = "proximanovalight", regular = "fonts/ProximaNova-Light.ttf")
+font_add(family = "proximanovaboldlight", regular = "fonts/ProximaNova-Bold.ttf")
+font_add(family = "montserrat-semibold", regular = "fonts/Montserrat-SemiBold.otf")
+font_add(family = "montserrat-med", regular = "fonts/Montserrat-Medium.otf")
+font_add(family = "montserrat", regular = "fonts/Montserrat-Regular.otf")
+
 
 # ------------------------------------------- # 
 # ------------ CRIME IN BROOKYLN ------------ #
@@ -44,7 +52,7 @@ font_add(family = "jaapokki", regular = "Jaapokki-Regular.otf")
 #          "OFFENSE_LV" = "LAW_CAT_CD",
 #          "OFFENSE_DESC" = "OFNS_DESC")
 # write.csv(nypd_bk, "data/NYPD/nypd_brooklyn.csv")
-  
+
 # only brooklyn data and relevant column
 nypd_brooklyn_data <- nypd %>% 
   filter(OFFENSE_LV == "FELONY") %>% # filter to offense level of felony, the most severe
@@ -72,9 +80,9 @@ geo_url <- "https://data.cityofnewyork.us/api/geospatial/fxpq-c8ku?method=export
 tract_sf <- read_sf(geo_url) %>% 
   st_transform(2263) %>%
   dplyr::select(ntacode, ntaname, # neighborhood code & name (55 for Brooklyn eg Crown Heights, Bushwick)
-         boro_code, boro_name, #  borough code & name (Brooklyn, Manhattan, Queens, Bronx...)
-         boro_ct2010, # borough census tract defined in 2010, compound key
-         ctlabel) %>% # census tract label (number)
+                boro_code, boro_name, #  borough code & name (Brooklyn, Manhattan, Queens, Bronx...)
+                boro_ct2010, # borough census tract defined in 2010, compound key
+                ctlabel) %>% # census tract label (number)
   rename(NTA_CODE = "ntacode",
          NTA_NAME = "ntaname",
          BORO_CODE = "boro_code",
@@ -129,16 +137,17 @@ crimeCount <- function(year) {
     # ------------------------------
   filter(BORO_NAME == "Brooklyn") %>% # only for Brooklyn borough
     dplyr::select(NTA_CODE, NTA_NAME, # neighborhood code & name
-           BORO_NAME, # brooklyn 
-           BORO_CT_KEY, TRACT_NO, # census tract code & compound key 
-           FELONY_TYPE,  FEL_NTA_CNT, FEL_CT_CNT, # felonies 
-           OFN_NTA_CNT, OFN_CT_CNT) %>% # can include OFFENSE_LV if we want more than felonies
+                  BORO_NAME, # brooklyn 
+                  BORO_CT_KEY, TRACT_NO, # census tract code & compound key 
+                  FELONY_TYPE,  FEL_NTA_CNT, FEL_CT_CNT, # felonies 
+                  OFN_NTA_CNT, OFN_CT_CNT) %>% # can include OFFENSE_LV if we want more than felonies
     # ------------------------------
   distinct() %>% # only distinct ones 
-  na.omit() # remove na
+    na.omit() # remove na
   
   return(bk_crime_count)
 }
+
 
 # ******************** //////// ************************* # 
 
@@ -165,15 +174,14 @@ crimeCount <- function(year) {
 bkGentri <- function(year) {
   
   census_data_tract <- get_acs(geography = "tract", # tract  
-                         variables = c(TOTAL_POPN = "B01003_001E", # demographic 
-                                       WHITE_ALONE = "B03002_003E",
-                                       # NATIVE_BORN = "B05012_002E",
-                                       FOREIGN_BORN = "B05012_003E",
-                                       NO_HIGHSCH = "B06009_002E"),
-                         output = "wide",
-                         county = "Kings", 
-                         state = "NY",
-                         year = year)
+                               variables = c(TOTAL_POPN = "B01003_001E", # demographic 
+                                             WHITE_ALONE = "B03002_003E",
+                                             FOREIGN_BORN = "B05012_003E",
+                                             NO_HIGHSCH = "B06009_002E"),
+                               output = "wide",
+                               county = "Kings", 
+                               state = "NY",
+                               year = year)
   
   census_data_tract %>% 
     mutate(YEAR = year) %>% 
@@ -226,13 +234,13 @@ calcChange <- function(bk_gentri_1, bk_gentri_2) {
            "TOTAL_POPN_1" = "TOTAL_POPN.y",
            "TOTAL_POPN_2" = "TOTAL_POPN.x") %>%
     dplyr::select(GEOID, CENSUS_TRACT, YEAR, GENTRI_SCORE, 
-           TOTAL_POPN_1, TOTAL_POPN_2, POPN_CHANGE, 
-           WHITE_CHANGE, FOREIGN_CHANGE, NO_HS_CHANGE) %>%
+                  TOTAL_POPN_1, TOTAL_POPN_2, POPN_CHANGE, 
+                  WHITE_CHANGE, FOREIGN_CHANGE, NO_HS_CHANGE) %>%
     na.omit()
   
   return(bk_gen_change)
   
-}
+} 
 
 # ******************** /////// ************************* # 
 
@@ -272,7 +280,6 @@ mergeTracts <- function(bk_gen_1_2, bk_count_1, bk_count_2) {
   tracts_geoid <- merge(tracts, bk_gen, by.x="GEOID", by.y="GEOID")
   geoid_df <- as_tibble(tracts_geoid)
   
-  
   # ----
   # merge gentrification & spatial with crime 
   bk_gentri_crime_1 <- geoid_df %>%
@@ -280,43 +287,43 @@ mergeTracts <- function(bk_gen_1_2, bk_count_1, bk_count_2) {
     
     # with earlier year crime data 
     left_join(bk_count_1, by = "TRACT_NO") %>% # Merge with Tract No.
-    # mutate(OFN_NTA_PAX = OFN_NTA_CNT/TOTAL_POPN) %>%
-    # mutate(OFN_CT_PAX = OFN_CT_CNT/TOTAL_POPN) %>%
-    mutate(FEL_CT_PAX = FEL_CT_CNT/TOTAL_POPN_1) %>%
-    rename(FEL_CT_PAX_1 = FEL_CT_PAX,
-           FEL_CT_CNT_1 = FEL_CT_CNT) %>%
+    mutate(OFN_CT_PAX_1 = OFN_CT_CNT/TOTAL_POPN_1) %>%
+    mutate(FEL_CT_PAX_1 = FEL_CT_CNT/TOTAL_POPN_1) %>%
+    rename(OFN_CT_CNT_1 = OFN_CT_CNT) %>%
+    rename(FEL_CT_CNT_1 = FEL_CT_CNT) %>%
     # select variables to prevent repetition
     dplyr::select("YEAR",
-           "GEOID", "TRACT_NO", "CENSUS_TRACT", 
-           "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
-           "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
-           "FEL_CT_PAX_1", "FEL_CT_CNT_1") 
+                  "GEOID", "TRACT_NO", "CENSUS_TRACT", 
+                  "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
+                  "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
+                  "FEL_CT_PAX_1", "FEL_CT_CNT_1",  "FELONY_TYPE", "OFN_CT_PAX_1", "OFN_CT_CNT_1") 
   
   bk_gentri_crime <- bk_gentri_crime_1 %>%
     # with latest year crime data 
-    left_join(bk_count_2, by = "TRACT_NO") %>%
-    mutate(FEL_CT_PAX = FEL_CT_CNT/TOTAL_POPN_2) %>%
-    rename(FEL_CT_PAX_2 = FEL_CT_PAX,
-           FEL_CT_CNT_2 = FEL_CT_CNT) %>%
-    
+    left_join(bk_count_2, by = c("TRACT_NO", "FELONY_TYPE")) %>%
+    mutate(FEL_CT_PAX_2 = FEL_CT_CNT/TOTAL_POPN_2) %>%
+    mutate(OFN_CT_PAX_2 = OFN_CT_CNT/TOTAL_POPN_2) %>%
+    rename(OFN_CT_CNT_2 = OFN_CT_CNT) %>%
+    rename(FEL_CT_CNT_2 = FEL_CT_CNT) %>%
     # select variables
     dplyr::select("BORO_NAME", "YEAR",
-           "GEOID", "NTA_NAME", "NTA_CODE", "BORO_CT_KEY", "TRACT_NO", "CENSUS_TRACT", 
-           "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
-           "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE",
-           "FEL_CT_PAX_1", "FEL_CT_CNT_1",
-           "FEL_CT_PAX_2", "FEL_CT_CNT_2") %>%
-    # "OFN_NTA_PAX", "OFN_NTA_CNT",
-    # "OFN_CT_PAX", "OFN_CT_CNT") %>%
+                  "GEOID", "NTA_NAME", "NTA_CODE", "BORO_CT_KEY", "TRACT_NO", "CENSUS_TRACT", 
+                  "TOTAL_POPN_1", "TOTAL_POPN_2", "POPN_CHANGE", 
+                  "GENTRI_SCORE", "WHITE_CHANGE", "FOREIGN_CHANGE", "NO_HS_CHANGE", "FELONY_TYPE",
+                  "FEL_CT_PAX_1", "FEL_CT_PAX_2", "OFN_CT_PAX_1", "OFN_CT_PAX_2", 
+                  "FEL_CT_CNT_1", "OFN_CT_CNT_1", "FEL_CT_CNT_2", "OFN_CT_CNT_2") %>%
+    
     distinct() %>%
     na.omit()
   
 }
 
+
 # ******************** /////// ************************* # 
 
 
 # get the mean for NTA e.g. mean Felony rate and change, mean Gentri score, remove BK99, 
+
 calcScore <- function(bk_gen_crime) {
   
   bk_gen_crime %>%
@@ -325,16 +332,43 @@ calcScore <- function(bk_gen_crime) {
     mutate(NTA_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
     mutate(FEL_NTA_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
     mutate(FEL_NTA_CNT_2 = sum(FEL_CT_CNT_2)) %>%
+    mutate(OFN_NTA_CNT_1 = sum(OFN_CT_CNT_1)) %>%  
+    mutate(OFN_NTA_CNT_2 = sum(OFN_CT_CNT_2)) %>%
     mutate(TOTAL_POPN_NTA_1 = sum(TOTAL_POPN_1)) %>%
     mutate(TOTAL_POPN_NTA_2 = sum(TOTAL_POPN_2)) %>%
     mutate(FEL_NTA_PAX_1 = FEL_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
     mutate(FEL_NTA_PAX_2 = FEL_NTA_CNT_2/TOTAL_POPN_NTA_2) %>% 
+    mutate(OFN_NTA_PAX_1 = OFN_NTA_CNT_1/TOTAL_POPN_NTA_1) %>%  
+    mutate(OFN_NTA_PAX_2 = OFN_NTA_CNT_2/TOTAL_POPN_NTA_2) %>% 
     mutate(FEL_NTA_CHANGE = FEL_NTA_PAX_2 - FEL_NTA_PAX_1) %>% 
+    mutate(OFN_NTA_CHANGE = OFN_NTA_PAX_2 - OFN_NTA_PAX_1) %>% 
     # for nta only 
-    dplyr::select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FEL_NTA_PAX_1, FEL_NTA_PAX_2, FEL_NTA_CHANGE) %>% 
+    dplyr::select(BORO_NAME, NTA_NAME, NTA_CODE, NTA_GENTRI_SCORE, FELONY_TYPE, FEL_NTA_PAX_1, FEL_NTA_PAX_2, FEL_NTA_CHANGE, OFN_NTA_PAX_1, OFN_NTA_PAX_2, OFN_NTA_CHANGE) %>% 
     distinct()
   
 }
+
+
+
+calcScore_CT <- function(bk_gen_crime) {
+  
+  bk_gen_crime %>%
+    filter(NTA_CODE != "BK99") %>%
+    group_by(TRACT_NO) %>%
+    mutate(CT_GENTRI_SCORE = mean(GENTRI_SCORE)) %>% 
+    mutate(FEL_CT_CNT_1 = sum(FEL_CT_CNT_1)) %>%  
+    mutate(FEL_CT_CNT_2 = sum(FEL_CT_CNT_2)) %>%
+    mutate(TOTAL_POPN_CT_1 = sum(TOTAL_POPN_1)) %>%
+    mutate(TOTAL_POPN_CT_2 = sum(TOTAL_POPN_2)) %>%
+    mutate(FEL_CT_PAX_1 = FEL_CT_CNT_1/TOTAL_POPN_CT_1) %>%  
+    mutate(FEL_CT_PAX_2 = FEL_CT_CNT_2/TOTAL_POPN_CT_2) %>% 
+    mutate(FEL_CT_CHANGE = FEL_CT_PAX_2 - FEL_CT_PAX_1) %>% 
+    # for ct only 
+    dplyr::select(BORO_NAME, GEOID, TRACT_NO, CENSUS_TRACT, NTA_NAME, NTA_CODE, CT_GENTRI_SCORE, FEL_CT_PAX_1, FEL_CT_PAX_2, FEL_CT_CHANGE) %>% 
+    distinct()
+  
+}
+
 
 
 ntaMean <- function(bkg, year) {
@@ -345,15 +379,35 @@ ntaMean <- function(bkg, year) {
     summarise(avg_gentri = mean(NTA_GENTRI_SCORE), 
               avg_crime_rate_1 = mean(FEL_NTA_PAX_1),
               avg_crime_rate_2 = mean(FEL_NTA_PAX_2),
-              crime_change = mean(FEL_NTA_CHANGE)) %>%  # crime rate per pax
+              crime_change = mean(FEL_NTA_CHANGE),
+              avg_ofn_rate_1 = mean(OFN_NTA_PAX_1),
+              avg_ofn_rate_2 = mean(OFN_NTA_PAX_2),
+              ofn_change = mean(OFN_NTA_CHANGE)
+    ) %>%  # crime rate per pax
+    
     mutate(year = year)
   
 }
 
-# final_2010_2018<- mergeTracts(2010, 2018)
-# # 
-# View(final_2010_2018)
-# 
+
+ctMean <- function(bkg, year) {
+  
+  bkg %>% 
+    mutate(gentrified = (CT_GENTRI_SCORE > 0)) %>% 
+    group_by(gentrified) %>% 
+    summarise(avg_ct_gentri = mean(CT_GENTRI_SCORE), 
+              avg_ct_crime_rate_1 = mean(FEL_CT_PAX_1),
+              avg_ct_crime_rate_2 = mean(FEL_CT_PAX_2),
+              ct_crime_change = mean(FEL_CT_CHANGE)
+    ) %>%  # crime rate per pax
+    
+    mutate(year = year)
+  
+}
+
+
+
+
 
 
 # -------------------------------------------------------- # 
@@ -406,7 +460,7 @@ toSpatial_tracts <- function(df) {
 
 # ******************** FUNCTION ************************* # 
 # plotting scatterplot of neighborhood name   
-  
+
 plotTextScatter <- function(bkg_year, year_1, year_2) { 
   
   bk_nta <- bkg_year %>%
@@ -432,7 +486,7 @@ plotTextScatter <- function(bkg_year, year_1, year_2) {
          y = "\nChange in Felony Crime Rate\n") +
     theme_tufte() +
     theme(text = element_text(family = "raleway"),
-          plot.title = element_text(family = "jaapokki"))
+          plot.title = element_text(family = "montserrat"))
   
 } 
 
@@ -440,7 +494,7 @@ plotTextScatter <- function(bkg_year, year_1, year_2) {
 
 
 plotMapGentri <- function(df, year_1, year_2) {
-
+  
   ggplot(data = df) +
     geom_sf(aes(fill = NTA_GENTRI_SCORE), color = NA) +
     scale_fill_viridis_c(option = "magma", name = "Gentrification Score") +
@@ -448,7 +502,7 @@ plotMapGentri <- function(df, year_1, year_2) {
     theme_map() +
     theme(text = element_text(family = "raleway", size = 12),
           plot.title = element_text(family = "jaapokki", size = 18))
-
+  
 }
 
 
