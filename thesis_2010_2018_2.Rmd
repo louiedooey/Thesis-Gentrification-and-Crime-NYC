@@ -12,7 +12,7 @@ library(data.table)
 nypd  <- fread("data/NYPD/nypd_brooklyn.csv", header = TRUE)
 
 # functions located in another R sheet
-source("thesis_code_functions.R")
+source("thesis_code_functions_2.R")
 
 
 ```
@@ -104,6 +104,10 @@ beep()
 bkg_no_gentri <- bkg_all %>% 
   filter(NTA_GENTRI_SCORE < 0)
 
+# without greenpoint and brooklyn cobble hill
+bkg_no_gentri_2 <- bkg_no_gentri %>% 
+  filter(! NTA_CODE %in% c("BK09", "BK76")) 
+
 
 ```
 
@@ -128,26 +132,34 @@ pts16 <- plotTextScatter(bkg_2016, "2016", "2017")
 pts17 <- plotTextScatter(bkg_2017, "2017", "2018")
 pts_all <- plotTextScatter(bkg_all, "2010", "2018")
 pts_no <- plotTextScatter(bkg_no_gentri, "2010", "2018")
+pts_no_2 <- plotTextScatter(bkg_no_gentri_2, "2010", "2018") 
+
+
+
 
 pts_grid <- plot_grid(pts10, pts11, pts12,
                       pts13, pts14, pts15,
                       pts16, pts17, pts_all,
                       ncol = 3)
-
+# all gentri
 pts_all + 
   labs(title = "\n \nText Scatterplot of All Neighborhoods", 
        subtitle = "Positioned by Gentrification Index Score and Change in Crime Rates (2010 - 2018)\n \n")  
   
-pts_no + 
+# filtered
+pts_no_2 + 
   xlim(min(-5), max(1)) + 
   geom_vline(xintercept = 0, color = "#333333") + 
   labs(title = "\nText Scatterplot of Non-Gentrified Neighborhoods", 
        subtitle = "Gentrification Index Score and Change in Crime Rates (2010 - 2018)\n")
 
 
-# ggsave("visualizations/plot_text_scatter_grid.pdf", pts_grid, width = 12, height = 10)
-beep()
-ggsave("visualizations/Text Scatter/all-gentri-text-scatter.svg", width = 8, height = 5)
+# ggsave("visualizations/plot_text_scatter_grid.pdf", pts_grid, width = 12, height = 1)
+
+# ggsave("visualizations/Text Scatter/all-gentri-text-scatter.svg", width = 8, height = 5)
+# 
+# ggsave("visualizations/Text Scatter/no-gentri-filt-text-scatter.svg", width = 8, height = 5)
+
 
 ```
 
