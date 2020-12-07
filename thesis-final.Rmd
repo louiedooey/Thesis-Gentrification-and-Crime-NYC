@@ -87,6 +87,8 @@ bkg_ofn <- calcScore_OFN(bk_gen_crime_ofn_all)
 bkg_tract <- calcScore_CT(bk_gen_crime_all)
 
 
+
+
 ```
 
 # Keeping Non-Gentrified Areas  
@@ -99,6 +101,7 @@ bkg_no_gentri <- bkg_all %>%
 bkg_no_gentri_2 <- bkg_no_gentri %>% 
   filter(! NTA_CODE %in% c("BK09", "BK76")) 
 
+View(bkg_no_gentri_2)
 
 ```
 
@@ -175,7 +178,7 @@ fel_change_all <- bkg_ofn_df %>%
 
 ftypes <- ggplot() +
   geom_point(data = fel_change_all, aes(x = FELONY_TYPE, y = `mean(OFN_NTA_CHANGE)`, fill = "All Boroughs"), color = "black") + 
-  geom_point(data = fel_change_2, aes(x = FELONY_TYPE, y = `mean(OFN_NTA_CHANGE)`, fill = "Bay Ride & Sunset Park"), color = "cyan4", alpha = 0.5) +
+  geom_point(data = fel_change_2, aes(x = FELONY_TYPE, y = `mean(OFN_NTA_CHANGE)`, fill = "Bay Ridge & Sunset Park"), color = "cyan4", alpha = 0.5) +
   # scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
   geom_hline(yintercept = 0, color = "grey70") + 
   coord_flip() +
@@ -189,7 +192,7 @@ ftypes <- ggplot() +
   
 
 
-# ggsave("visualizations/felony-types.svg", ftypes, width = 12, height = 5)
+ggsave("visualizations/felony-types.svg", ftypes, width = 12, height = 5)
 
 ```
 
@@ -287,16 +290,6 @@ beep()
 # Time Series all trend lines
 
 ```{r}
-bkg_2010 <- calcScore(bk_gen_crime_2010)
-bkg_2011 <- calcScore(bk_gen_crime_2011)
-bkg_2012 <- calcScore(bk_gen_crime_2012)
-bkg_2013 <- calcScore(bk_gen_crime_2013)
-bkg_2014 <- calcScore(bk_gen_crime_2014)
-bkg_2015 <- calcScore(bk_gen_crime_2015)
-bkg_2016 <- calcScore(bk_gen_crime_2016)
-bkg_2017 <- calcScore(bk_gen_crime_2017)
-
-bkg_all <- calcScore(bk_gen_crime_all)
 
 nta_mean <- ntaMean(bkg_2011, 2011) %>% 
   bind_rows(ntaMean(bkg_2012, 2012)) %>%
@@ -397,17 +390,92 @@ nta_map_2017 <- toSpatial_NTA(bkg_2017)
 
 nta_map_all <- toSpatial_NTA(bkg_all)
 nta_map_no_gentri <- toSpatial_NTA(bkg_no_gentri)
+nta_map_no_gentri_2 <- toSpatial_NTA(bkg_no_gentri_2)
 
 ct_map <- toSpatial_tracts(bkg_tract)
 
-ct_map_no_gentri <- semi_join(bkg_tract, bkg_no_gentri_2, join_by = "NTA_CODE")
+ct_map_no_gentri <- bkg_tract %>%
+  semi_join(bkg_no_gentri_2, join_by = "NTA_CODE") %>%
+  filter(! NTA_CODE %in% c("BK09", "BK76")) %>%
+  toSpatial_tracts()
 
-# writeOGR(obj = nta_map_no_gentri_spa, dsn = "nta_map_no_gentri", layer = "layers", driver = "ESRI Shapefile")
+ct_map_no_gentri_spa <- ct_map_no_gentri %>%
+  as_Spatial()
+
+# writeOGR(obj = ct_map_no_gentri_spa, dsn = "ct_map_no_gentri", layer = "layers", driver = "ESRI Shapefile")
 beep()
+
+
+ct_poly <- readShapePoly("ct_map_no_gentri/layers.shp")
+
+
 ```
 
 
 ```{r}
+
+View(ct_map_no_gentri)
+
+names(ct_poly)
+
+fit_ct <- lm(FEL_CT_CHANGE ~ CT_GENTRI_SCORE, data = ct_poly)
+
+names(ct_map_no_gentri)
+
+fit <- stan_glm(FEL_CT_CHANGE ~ CT_GENTRI_SCORE, data = ct_map_no_gentri, refresh = 0) 
+
+print(fit, digits = 6)
+
+plot(fit_ct, which = 3)
+
+resids <- residuals(fit_ct)
+# resids <- residuals(ct_reg)
+
+ct_reg <- as_Spatial(ct_map_no_gentri)
+
+colours <- c("dark blue", "blue", "red", "dark red") 
+#here it is assumed that your eastings and northings coordinates are stored in columns called x and y in your dataframe
+map.resids <- SpatialPointsDataFrame(data=data.frame(resids), coords=cbind(x,y)) 
+
+#for speed we are just going to use the quick sp plot function, but you could alternatively store your residuals back in your LondonWards dataframe and plot using geom_point in ggplot2
+spplot(map.resids, cuts=quantile(resids), col.regions=colours, cex=1) 
+
+
+
+bp_ct <- ggplot(data = ct_map_no_gentri) + 
+  geom_boxplot(aes(x = FEL_CT_CHANGE)) + 
+  ylim(-3, 3) + 
+  labs(title = "\nBoxplot of Change in Crime Rates for Non-Gentrified Tracts",
+      subtitle = "(2010 - 2018)\n",
+      x = "\nChange in Crime Rates by Neighborhood\n") +
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "grey50") +
+  theme(text = element_text(family = "raleway", size = 14), 
+        plot.title = element_text(family = "montserrat", size = 17))
+        # plot.margin=unit(c(3,3,3,3),"cm"))
+
+bp_nta<- ggplot(data = nta_map_no_gentri_2) + 
+  geom_boxplot(aes(x = FEL_NTA_CHANGE)) + 
+  labs(title = "\nBoxplot of Change in Crime Rates for Non-Gentrified Neighborhoods",
+    subtitle = "(2010 - 2018)\n",
+    x = "\nChange in Crime Rates by Neighborhood\n") + 
+  ylim(-3, 3) + 
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "grey50") +
+  theme(text = element_text(family = "raleway", size = 14), 
+      plot.title = element_text(family = "montserrat", size = 17)) 
+      # plot.margin=unit(c(3,3,3,3),"cm"))
+
+
+bp_grid <- plot_grid(bp_ct, bp_nta, n_col = 0)
+
+# ggplot(data = ct_map_no_gentri) + 
+#   geom_sf(aes(fill = FEL_CT_CHANGE))
+
+ggsave("visualizations/box_plot_fel_both.svg", bp_grid, width = 8, height = 15)
+ggsave("visualizations/box_plot_fel_tract.svg", bp_ct, width = 10, height = 4)
+ggsave("visualizations/box_plot_fel_nta.svg", bp_nta, width = 10, height = 4)
+
 
 ```
 
@@ -447,7 +515,7 @@ ntm17 <- plotMapGentri(nta_map_2017, "2017", "2018")
 
 
 ntm_all <- plotMapGentri(nta_map_all, "2010", "2018")
-ntm_no_gentri <- plotMapGentri(nta_map_no_gentri, "2010", "2018")
+ntm_no_gentri <- plotMapGentri(nta_map_no_gentri_2, "2010", "2018")
 
 
 ntm_grid <- plot_grid(ntm10, ntm11, ntm12,
@@ -472,7 +540,7 @@ pmc15 <- plotMapCrime(nta_map_2015, "2015", "2016")
 pmc16 <- plotMapCrime(nta_map_2016, "2016", "2017")
 pmc17 <- plotMapCrime(nta_map_2017, "2017", "2018")
 pmc_all <- plotMapCrime(nta_map_all, "2010", "2018")
-pmc_no_gentri <- plotMapCrime(nta_map_no_gentri, "2010", "2018")
+pmc_no_gentri <- plotMapCrime(nta_map_no_gentri_2, "2010", "2018")
                         
 pmc_grid <- plot_grid(pmc10, pmc11, pmc12,
                       pmc13, pmc14, pmc15,
@@ -497,118 +565,40 @@ pmc_all <- pmc_all +
         plot.title = element_text(family = "montserrat", size = 18))
 
 
-pmc_no_gentri_both <- pmc_no_gentri + 
+pmc_no_gentri_both_fel <- pmc_no_gentri + 
   geom_sf(data = nta_map_all, aes(color = "honeydew3"), color = NA) + 
-  geom_sf(data = nta_map_no_gentri, aes(fill = nta_map_no_gentri$FEL_NTA_CHANGE), color = NA) + 
+  geom_sf(data = nta_map_no_gentri_2, aes(fill = nta_map_no_gentri_2$FEL_NTA_CHANGE), color = NA) + 
   scale_fill_viridis_c(option = "magma", name = "Change in Crime Rates", direction = -1) + 
-  labs(title = "Change in Crime Rates for\nNon-Gentrified Neighborhoods (2010 - 2018)\n") + 
-  theme(text = element_text(family = "raleway", size = 12), 
-        plot.title = element_text(family = "montserrat", size = 18))
+  labs(title = "Change in Crime Rates for\nNon-Gentrified Neighborhoods",
+      subtitle = "(2010 - 2018)\n") + 
+  theme(text = element_text(family = "raleway", size = 14), 
+        plot.title = element_text(family = "montserrat", size = 17), 
+        plot.margin=unit(c(1,1,1.5,1.2),"cm"))
 
-both_grid <- plot_grid(ntm_all, pmc_all, ncol = 2)
+
+pmc_no_gentri_both_gentri <- pmc_no_gentri + 
+  geom_sf(data = nta_map_all, aes(color = "honeydew3"), color = NA) + 
+  geom_sf(data = nta_map_no_gentri_2, aes(fill = nta_map_no_gentri_2$NTA_GENTRI_SCORE), color = NA) + 
+  scale_fill_viridis_c(option = "magma", name = "Gentrification Score", direction = 1) + 
+  labs(title = "Gentrification Score for\nNon-Gentrified Neighborhoods", 
+       subtitle = "(2010 - 2018)\n") + 
+  theme(text = element_text(family = "raleway", size = 14), 
+        plot.title = element_text(family = "montserrat", size = 17), 
+        plot.margin=unit(c(10,10,10,10),"cm"))
+
+
+
+both_grid <- plot_grid(pmc_no_gentri_both_gentri, pmc_no_gentri_both_fel, ncol = 2)
 # 
 # ggsave("visualizations/Map/map_all_gentri.svg", ntm_all, width = 8, height = 5)
 # ggsave("visualizations/Map/map_all_crime.svg", pmc_all, width = 8, height = 5)
-# ggsave("visualizations/Map/map_both.svg", both_grid, width = 9, height = 5)
+ggsave("visualizations/Map/map_grid_gentri.svg", ntm_grid, width = 14, height = 11)
+ggsave("visualizations/Map/map_grid_fel.svg", pmc_grid, width = 14, height = 11)
+ggsave("visualizations/Map/map_both.svg", both_grid, width = 9, height = 5)
 # 
 # ggsave("visualizations/Map/map_no_gentri_crime.svg", pmc_no_gentri_both, width = 8, height = 5)
 # 
 # 
-
-```
-
-
-
-
-```{r}
-mapAnalysis(ntm_no_gentri, NTA_GENTRI_SCORE)
-# mapAnalysis <- function(nta_map, var) {
-#   
-#   map_analysis <- nta_map %>% 
-#   as_Spatial()
-#   
-#   # Queens Contiguity Matrix
-#   spat_matrix <- poly2nb(map_analysis)
-# 
-#   # Neighbors list with Spatial Weihgts
-#   list_w <- nb2listw(spat_matrix)
-#   
-#   # calculate local Moran of the distribution 
-#   lmoran <- localmoran(map_analysis$var, list_w)
-#   
-#   # padronize the variable and save it to a new column 
-# map_analysis$s_var <- scale(map_analysis$var) %>% as.vector()
-# 
-# # create a spatially lagged variable and save it to a new column 
-# map_analysis$lag_s_var <- lag.listw(list_w, map_analysis$s_var)
-# 
-# # moran scatterplot, in basic graphics - with identificaiton of influential observations 
-# x <- map_analysis$s_var
-# y <- map_analysis$lag_s_var %>% as.vector()
-# xx <- data.frame(x, y)
-# 
-# g <- ggplot(xx, aes(x, y)) + 
-#   geom_point() + 
-#   geom_smooth(method = "lm", se = F) + 
-#   geom_hline(yintercept = 0, linetype = "dashed") + 
-#   geom_vline(xintercept = 0, linetype = "dashed")
-# 
-# # QUADRANTS 
-# 
-# map_analysis$quad_sig <- NA
-# 
-# # high high quadrant 
-# map_analysis[(map_analysis$s_var >= 0 & 
-#               map_analysis$lag_s_var >= 0) & 
-#                (lmoran[, 5] <= 0.05), "quad_sig"] <- "high-high"
-# 
-# # low low  quadrant 
-# map_analysis[(map_analysis$s_var <= 0 & 
-#               map_analysis$lag_s_var <= 0) & 
-#                (lmoran[, 5] <= 0.05), "quad_sig"] <- "low-low"
-# 
-# # high low  quadrant 
-# map_analysis[(map_analysis$s_var >= 0 & 
-#               map_analysis$lag_s_var <= 0) & 
-#                (lmoran[, 5] <= 0.05), "quad_sig"] <- "highlow"
-# 
-# # low low  quadrant 
-# map_analysis[(map_analysis$s_var <= 0 & 
-#               map_analysis$lag_s_var >= 0) & 
-#                (lmoran[, 5] <= 0.05), "quad_sig"] <- "low-high"
-# 
-# # non-significant observations
-# 
-# map_analysis@data[(lmoran[, 5] > 0.05), "quad_sig"] <- "not signif."
-# map_analysis$quad_sig <- as.factor(map_analysis$quad_sig)
-# map_analysis@data$id <- rownames(map_analysis@data)
-# 
-# 
-# 
-# # plotting the map
-# df <- fortify(map_analysis, region = "id") # make it ready for mapping
-# df <- left_join(df, map_analysis@data)
-# 
-# 
-# lisa_plot <- df %>% 
-#   ggplot(aes(long, lat, group = group, fill = quad_sig)) + 
-#   geom_polygon(color = "white", size = .05) + 
-#   coord_equal() + 
-#   labs(title = "\nLISA Clusters\n") +
-#        # for\nChange in Gentrification Score (2010-2018)") +
-#   scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
-#   theme_map() + 
-#   theme(text = element_text(family = "raleway", size = 12), 
-#         plot.title = element_text(family = "jaapokki", size = 18, color = "grey20"))
-# 
-# return(c(summary(lmoran), 
-#          # summary of variables to form the analysis 
-#       summary(map_analysis$s_var),
-#       summary(map_analysis$lag_s_var),
-#       g, 
-#       lisa_plot))
-# 
-# }
 
 ```
 
@@ -618,10 +608,9 @@ mapAnalysis(ntm_no_gentri, NTA_GENTRI_SCORE)
 map_analysis <- nta_map_no_gentri %>%
   as_Spatial()
 
-map_analysis <- nta_map_all %>%
-  as_Spatial()
 
-map_analysis <- ct_map_no_gentri %>%
+
+map_analysis <- nta_map_all %>%
   as_Spatial()
 
 
@@ -735,27 +724,30 @@ lisa_gentri_plot <- df %>%
   geom_polygon(color = "white", size = .05) + 
   coord_equal() +
   labs(title = "\nLISA Clusters for\nChange in Gentrification Score (2010-2018)") + 
-  scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
+  scale_fill_manual(values = c("honeydew3"), name = "Quadrant\nSignificance") +
   theme_map() + 
   theme(text = element_text(family = "raleway", size = 12), 
         plot.title = element_text(family = "jaapokki", size = 18, color = "grey20"))
+
 lisa_grid <- plot_grid(lisa_fel_plot, lisa_gentri_plot,
                       ncol = 2)
+
 ggsave("visualizations/lisa-gentri-no-gentri.svg", lisa_gentri_plot, width = 8, height = 5)
 ggsave("visualizations/lisa-ct-fel-no-gentri.svg", lisa_fel_ct_plot, width = 8, height = 5)
 ggsave("visualizations/lisa-grid-no-gentri.svg", lisa_grid, width = 14, height = 10)
+
+
 ```
 
 
 ```{r}
 # CHOOSE TYPE OF MAP 
-map_analysis <- nta_map_no_gentri %>%
+map_analysis <- nta_map_no_gentri_2 %>%
   as_Spatial()
 
-map_analysis <- nta_map_all %>%
-  as_Spatial()
-  
-  
+# map_analysis <- nta_map_all %>%
+  # as_Spatial()
+
 # Queens Contiguity Matrix
 spat_matrix <- poly2nb(map_analysis)
 # Neighbors list with Spatial Weihgts
@@ -763,8 +755,13 @@ list_w <- nb2listw(spat_matrix)
 # calculate local Moran of the distribution 
 lmoran_f <- localmoran(map_analysis$FEL_NTA_CHANGE, list_w)
 lmoran_g <- localmoran(map_analysis$NTA_GENTRI_SCORE, list_w)
-summary(lmoran_f)
+
+sum_f <- summary(lmoran_f)
+
 summary(lmoran_g)
+stargazer(lmoran_f, summary = TRUE, out = "lmoran_f.png")
+
+
 # padronize the variable and save it to a new column 
 map_analysis$s_fel <- scale(map_analysis$FEL_NTA_CHANGE) %>% as.vector()
 map_analysis$s_gentri <- scale(map_analysis$NTA_GENTRI_SCORE) %>% as.vector()
@@ -776,8 +773,9 @@ summary(map_analysis$s_fel)
 summary(map_analysis$lag_s_fel)
 summary(map_analysis$s_gentri)
 summary(map_analysis$lag_s_gentri)
+
+
 # moran scatterplot, in basic graphics - with identificaiton of influential observations 
-x_fel <- map_analysis$s_fel
 y_fel <- map_analysis$lag_s_fel %>% as.vector()
 xx_fel <- data.frame(x_fel, y_fel)
 x_gentri <- map_analysis$s_gentri
@@ -785,11 +783,22 @@ y_gentri <- map_analysis$lag_s_gentri %>% as.vector()
 xx_gentri <- data.frame(x_gentri, y_gentri)
 moran.plot(x_fel, list_w)
 moran.plot(x_gentri, list_w)
+
+xx <- data.frame(x = x_fel, y = y_fel)
 ggplot(xx, aes(x_fel, y_fel)) + 
   geom_point() + 
-  geom_smooth(method = "lm", se = F) + 
-  geom_hline(yintercept = 0, linetype = "dashed") + 
-  geom_vline(xintercept = 0, linetype = "dashed")
+  geom_smooth(method = "lm", se = F, color = "hotpink4") + 
+  geom_hline(yintercept = 0, linetype = "dashed", color = "deepskyblue4") + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "deepskyblue4") + 
+  theme_minimal() + 
+  labs(title = "\nMoran's I Scatterplot",
+       subtitle = "Felony for Non-Gentrified Neighborhoods\n",
+       x = "\nFelony\n", 
+       y = "\nSpatially Lagged Felony\n") + 
+  theme(text = element_text(family = "raleway", size = 12), 
+        plot.title = element_text(family = "montserrat", size = 18, color = "grey20"))
+  
+
 # QUADRANTS 
 map_analysis$quad_sig_fel <- NA
 map_analysis$quad_sig_gentri <- NA
@@ -812,7 +821,6 @@ map_analysis[(map_analysis$s_fel <= 0 &
 # FOR GENTRI
 # high high quadrant 
 map_analysis[(map_analysis$s_gentri >= 0 & 
-              map_analysis$lag_s_gentri >= 0) & 
                (lmoran_g[, 5] <= 0.05), "quad_sig_gentri"] <- "high-high"
 # low low  quadrant 
 map_analysis[(map_analysis$s_gentri <= 0 & 
@@ -852,7 +860,7 @@ lisa_gentri_plot <- df %>%
   geom_polygon(color = "white", size = .05) + 
   coord_equal() +
   labs(title = "\nLISA Clusters for\nChange in Gentrification Score (2010-2018)") + 
-  scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
+  scale_fill_manual(values = c("honeydew3"), name = "Quadrant\nSignificance") +
   theme_map() + 
   theme(text = element_text(family = "raleway", size = 12), 
         plot.title = element_text(family = "montserrat", size = 18, color = "grey20"))
@@ -862,7 +870,24 @@ lisa_grid <- plot_grid(lisa_fel_plot, lisa_gentri_plot,
 
 ggsave("visualizations/lisa-gentri-no-gentri.svg", lisa_gentri_plot, width = 8, height = 5)
 
+ggsave("visualizations/morans-i.svg", width = 8, height = 5)
+
 ggsave("visualizations/lisa-fel-no-gentri-2.svg", lisa_fel_plot, width = 8, height = 5)
 
 ggsave("visualizations/lisa-grid-no-gentri.svg", lisa_grid, width = 13, height = 8)
 ```
+
+
+```{r}
+
+fit_1 <- stan_glm(FEL_NTA_CHANGE ~ NTA_GENTRI_SCORE, data = nta_map_no_gentri_2, refresh = 0)
+
+fit_2 <- stan_glm(FEL_CT_CHANGE ~ CT_GENTRI_SCORE, data = nta_map_no_gentri_2, refresh = 0)
+
+p <- print(fit_1, digits = 5)
+
+stargazer(fit_1)
+
+
+```
+

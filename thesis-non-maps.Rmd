@@ -59,36 +59,7 @@ pmc_ct_no_gentri <- plotMapCrime(nta_map_ct_no_gentri, "2010", "2018")
   
 
 
-cso_df <- cso %>% as.data.frame()
 
-
-fel_change_2 <- cso_df %>% 
-  filter(NTA_CODE %in% c("BK31", "BK34")) %>%
-  group_by(FELONY_TYPE) %>%
-  summarise(mean(OFN_NTA_CHANGE))
-  
-fel_change_all <- cso_df %>% 
-  group_by(FELONY_TYPE) %>%
-  summarise(mean(OFN_NTA_CHANGE))
-
-
-ftypes <- ggplot() +
-  geom_point(data = fel_change_all, aes(x = FELONY_TYPE, y = `mean(OFN_NTA_CHANGE)`, fill = "All Boroughs"), color = "black") + 
-  geom_point(data = fel_change_2, aes(x = FELONY_TYPE, y = `mean(OFN_NTA_CHANGE)`, fill = "Bay Ride & Sunset Park"), color = "cyan4", alpha = 0.5) +
-  # scale_fill_manual(values = c("darksalmon", "palegreen3", "honeydew3"), name = "Quadrant\nSignificance") +
-  geom_hline(yintercept = 0, color = "grey70") + 
-  coord_flip() +
-  theme_minimal() +
-  labs(title = "\nDifferent Types of Felonies among Boroughs",
-      subtitle = "Change in Crime Rates (2010 - 2018)\n",
-      y = "\nAverage Change in Crime Rate\n",
-      x = "\nTypes of Felonies\n") +
-  theme(text = element_text(family = "raleway", size = 12), 
-        plot.title = element_text(family = "montserrat", size = 18))
-  
-
-
-# ggsave("visualizations/felony-types.svg", ftypes, width = 12, height = 5)
 
 
 ```

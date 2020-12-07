@@ -14,6 +14,8 @@ library(beepr)
 library(GISTools)
 library(spdep)
 library(spgwr)
+library(rstanarm)
+library(stargazer)
 
 # Fonts 
 showtext_auto()
