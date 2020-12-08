@@ -87,7 +87,7 @@ bkg_ofn <- calcScore_OFN(bk_gen_crime_ofn_all)
 bkg_tract <- calcScore_CT(bk_gen_crime_all)
 
 
-
+View(bkg_all)
 
 ```
 
@@ -454,7 +454,7 @@ bp_ct <- ggplot(data = ct_map_no_gentri) +
         plot.title = element_text(family = "montserrat", size = 17))
         # plot.margin=unit(c(3,3,3,3),"cm"))
 
-bp_nta<- ggplot(data = nta_map_no_gentri_2) + 
+bp_nta <- ggplot(data = nta_map_no_gentri_2) + 
   geom_boxplot(aes(x = FEL_NTA_CHANGE)) + 
   labs(title = "\nBoxplot of Change in Crime Rates for Non-Gentrified Neighborhoods",
     subtitle = "(2010 - 2018)\n",
@@ -464,6 +464,20 @@ bp_nta<- ggplot(data = nta_map_no_gentri_2) +
   geom_vline(xintercept = 0, color = "grey50") +
   theme(text = element_text(family = "raleway", size = 14), 
       plot.title = element_text(family = "montserrat", size = 17)) 
+
+
+bp_all <- ggplot(data = nta_map_all) + 
+  geom_boxplot(aes(x = FEL_NTA_CHANGE)) + 
+  labs(title = "\nBoxplot of Change in Crime Rates for All Neighborhoods",
+    subtitle = "(2010 - 2018)\n",
+    x = "\nChange in Crime Rates by Neighborhood\n") + 
+  ylim(-3, 3) + 
+  xlim(-0.004, 0.0025) +
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "grey50") +
+  theme(text = element_text(family = "raleway", size = 14), 
+      plot.title = element_text(family = "montserrat", size = 17)) 
+
       # plot.margin=unit(c(3,3,3,3),"cm"))
 
 
@@ -475,6 +489,9 @@ bp_grid <- plot_grid(bp_ct, bp_nta, n_col = 0)
 ggsave("visualizations/box_plot_fel_both.svg", bp_grid, width = 8, height = 15)
 ggsave("visualizations/box_plot_fel_tract.svg", bp_ct, width = 10, height = 4)
 ggsave("visualizations/box_plot_fel_nta.svg", bp_nta, width = 10, height = 4)
+ggsave("visualizations/box_plot_fel_all.svg", bp_all, width = 10, height = 4)
+
+
 
 
 ```
