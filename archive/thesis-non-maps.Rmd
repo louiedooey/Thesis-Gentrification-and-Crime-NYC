@@ -1,0 +1,66 @@
+---
+title: "thesis_non_maps"
+output: html_notebook
+---
+
+```{r}
+
+# functions located in another R sheet
+source("thesis_code_functions.R")
+
+
+```
+
+
+```{r}
+
+bk_count_2010 <- crimeCount(2010) # crime 
+bk_count_2018 <- crimeCount(2018) # crime 
+
+bk_gentri_2010 <- bkGentri(2010) # gentrification 
+bk_gentri_2018 <- bkGentri(2018) # gentrification
+
+bk_gen_all <- calcChange(bk_gentri_2010, bk_gentri_2018)
+
+bk_gen_crime_all <- mergeTracts(bk_gen_all, bk_count_2010, bk_count_2018)
+
+
+bkg_all <- calcScore(bk_gen_crime_all)
+bkg_ct_all <- calcScore_CT(bk_gen_crime_all)
+
+
+bkg_no_gentri <- bkg_all %>% 
+  filter(NTA_GENTRI_SCORE < 0)
+bkg_ct_no_gentri <- bkg_ct_all %>% 
+  semi_join(bkg_no_gentri, by = "NTA_CODE")
+
+nta_map_all <- toSpatial_NTA(bkg_all)
+nta_map_ct_all <- toSpatial_tracts(bkg_ct_all)
+nta_map_ct_no_gentri <- toSpatial_tracts(bkg_ct_no_gentri)
+
+
+ntm_all <- plotMapGentri(nta_map_all, "2010", "2018")
+ntm_no_gentri <- plotMapGentri(nta_map_no_gentri, "2010", "2018")
+
+pmc_all <- plotMapCrime(nta_map_all, "2010", "2018")
+pmc_no_gentri <- plotMapCrime(nta_map_no_gentri, "2010", "2018")
+
+pmc_ct_all <- plotMapCrime(nta_map_ct_all, "2010", "2018")
+pmc_ct_no_gentri <- plotMapCrime(nta_map_ct_no_gentri, "2010", "2018")
+
+  ggplot(data = nta_map_ct_no_gentri) +
+    geom_sf(aes(fill = FEL_CT_CHANGE), color = NA) +
+    scale_fill_viridis_c(option = "viridis", name = "Change in Crime Rates", direction = -1) + 
+    # labs(title = paste("\n", year_1, "-", year_2, "\n")) + 
+    theme_map() + 
+    theme(text = element_text(family = "raleway", size = 12), 
+          plot.title = element_text(family = "jaapokki", size = 18))
+  
+  
+
+
+
+
+
+```
+

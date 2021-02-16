@@ -1,0 +1,138 @@
+---
+title: 'Time Series Lab 1: Trend Analysis'
+author: "Louisa Ong"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+## 1. Conduct a trend analysis of some variable of interest.   
+## Graph it and try different functional forms.   
+## Look for subgroup variation across time, too.   
+## Extra credit if you consider other variables as a means of explaining the trend. Explain all of your results.
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(hrbrthemes)
+library(showtext)
+
+showtext_auto()
+font_add(family = "raleway", regular = "Raleway-Regular.ttf")
+font_add(family = "jaapokki", regular = "Jaapokki-Regular.otf")
+
+# from my thesis, original datasets from - 
+## U.S. Census Bureau, NYPD
+
+nta_mean <- fread("nta-gentri-crime-2010-2018.csv")
+
+
+head(nta_mean)
+
+```
+  
+## About:  
+The data used in this assignment comes from my thesis, which is about Understanding the Impact of Gentrification on Non-Gentrified areas in Brooklyn, by analyzing crime rates from 2010 - 2018.  
+
+## Methodology: 
+Two main datasets were used: 
+1. The original data from U.S. Census Bureau of demographic variables of counties in Brooklyn, accessed through the R tidycensus package. 
+2. A full list of Crimes Reported in NYPD and the addresses, taken from data.cityofnewyork.us and subsetted for Felony crimes.  
+
+Adopting Spatial Analysis techniques and a U.S. Census Bureau dataset of the list of defined "Neighborhood Tract Areas", I used two other shapefile datasets which helped me merge the demographic dataset and nypd dataset by neighborhood geographic boundaries.  
+I thus could obtain a collated dataset with crimes and demographic variables by neighborhood.
+  
+With reference to several academic data analysis papers on Gentrification, I defined the notion of Gentrification by A) the increase in number of whites living alone, B) increase in number of foreign born individuals and C) decrease in number of individuals without a high school degree. The percentage increase and decrease from a previous year were added (A + B - C) and this forms the gentrification score.  
+  
+Upon further analysis and visualizing this, almost half of the 51 Brooklyn neighborhoods had an average positive gentrification score, and the other half with an average negative gentrification score from 2010 - 2018. Furthermore, these were clustered geographically together and mostly reflected the stereotypes of those neighborhoods accurately, affirming that the methodology to obtain the gentrification score was valid.      
+  
+As such, I created a binary variable, "gentrified" for the neighborhoods that had a positive gentrification score (TRUE) and neighborhoods with a negative gentrification score (FALSE) for each year. I then got the mean of all the gentrified and non-gentrified neighborhoods separately for each year, and added the yearly data from 2010 - 2018 together. 
+This dataset, which I'm using for this assignment, also included the average crime rate per pax for all the neighborhoods, similarly separated by gentrified or non-gentrified.  
+
+The full code with the extensive data cleaning code can be found on my github:   [link](https://github.com/louiedooey/Thesis-Gentrification-and-Crime-NYC).  
+    
+ 
+  
+```{r warning = FALSE} 
+
+g <- ggplot() +
+  # plot points
+  geom_point(data = nta_mean, 
+             x = nta_mean$year,
+             y = nta_mean$avg_crime_rate_1*100,
+             group = nta_mean$gentrified) +
+  # plot trend line connecting points
+  geom_line(aes(x = nta_mean$year,
+                y = nta_mean$avg_crime_rate_1*100,
+                group = nta_mean$gentrified,
+                color = nta_mean$gentrified),
+                size = 1.02) +
+  # legend label 
+  scale_color_discrete(name = "Gentrification", labels = c("Absent", "Present")) +
+  
+  # tbeme elemnts
+  theme_ft_rc() +
+  theme(text = element_text(family = "raleway", size = 15),
+        plot.title = element_text(family = "jaapokki", size = 25))
+
+  
+g_linear <- g + 
+  geom_smooth(aes(x = nta_mean$year,
+              y = nta_mean$avg_crime_rate_1*100,
+              group = nta_mean$gentrified),
+              color = "#EEEEEE",
+              size = 0.2,
+              method = 'lm') + 
+  labs(title = "Fig. 1) Crime in Brooklyn between\nGentrified & Non-Gentrified Neighborhoods\n", 
+       x = "\nYear",
+       y = "Average Crime Rate (Felony)\n")
+
+g_linear
+
+```
+  
+I started by plotting the points of each data point, looking at the average crime rate (felony) over the time period of 2010 - 2018, comparing data of neighborhoods that have been gentrified (for that year), and neighborhoods that did not experience gentrification.  
+  
+Here, it can be observed that from 2010 - 2013, the average crime rates for gentrified neighborhoods increased significantly, from around 1.85 to 2.50 percent, while the opposite trend was observed among non-gentrified neighborhoods, where the average crime rate decreased from around 1.82 to 1.47 percent.  
+  
+However, this trend changes after 2013, where crime rates for gentrified neighborhoods decrease significantly and then remains constant and decreases again. For non-gentrified neighborhoods, crime rates first increase between 2013-2014, then remains relatively constant and decreases from 2017-2018. 
+
+  
+Using a linear regression plot, there is an overall downward trend for non-gentrified neighborhoods and almost an overall constant trend for gentrified neighborhoods. However, since this linear regression line does not reflect the steady variations in the data as the line plot displays, a quadratic regression could be more fitting.      
+
+
+    
+```{r warning = FALSE} 
+
+g_curve <- g + 
+  stat_smooth(aes(x = nta_mean$year,
+                  y = nta_mean$avg_crime_rate_1*100, 
+                   group = nta_mean$gentrified), 
+              method = "lm", 
+              formula = y ~ x + I(x^2), 
+              size = 0.4, 
+              color = "#EFEFEF") + 
+  labs(title = "Fig. 2) Crime in Brooklyn between\nGentrified & Non-Gentrified Neighborhoods\n", 
+       x = "\nYear",
+       y = "Average Crime Rate (Felony)\n") 
+
+g_curve
+
+```
+  
+Indeed, the quadratic regression model reflects the trend in crime rates better - there is an increase in crime rates for gentrified neighborhoods and the rate falls after 2015.  
+For non-gentrified neighborhoods, the crime rates decrease, though the rate of decrease becomes lower toward the later years.   
+  
+  
+Conclusions that can be made from this result are not straightforward. First, it is clear that the crime rates between gentrified and non-gentrified areas are distinctly different, and the trend in the increase and decrease of these rates varied distinctly from 2010 - 2014. However, due to such large variations in the overall rate of average crime rates in these two types of neighborhood across the time period of 2010 - 2018, a singular statement to describe the impact of gentrification on crime rates in non-gentrified neighborhoods can not be made.  
+
+Moving on from this, a further look into the changes between each year would be useful. It seems that there was something significant that happened in 2014 which aligned the trends of average crime rates for both neighborhoods. In addition, a previous analysis at the crime rates of each neighborhood showed a wide range of crime rates among the non-gentrified areas and this could provide further insight.   
+   
+     
+(Extra Credit)  
+Furthermore, the average felony rates are based on crimes reported, and not actual crimes, which may cause a degree of variation between the number of crimes reported and actual criminal activity present in the area.   
+In addition, the average number of felonies (crimes punishable by more than a year of imprisonment) reported per capita are definitely affected by a multitude of factors apart from gentrification of the neighborhood. This can include a stricter justice system where suspects are arrested more often and given heavier sentences, which can deter further criminal activity.       
+  
+  
+  
